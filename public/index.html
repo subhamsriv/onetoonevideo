@@ -1,0 +1,282 @@
+<html>
+
+<head>
+  <title>Express</title>
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <script src="/javascripts/socket.io.js"></script>
+  <script src="/javascripts/webrtc.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/carbon-components/css/carbon-components.min.css">
+  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vue"></script>
+  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+  <script src="	https://unpkg.com/carbon-components/scripts/carbon-components.min.js"></script>
+  <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/webrtc-adapter/7.3.0/adapter.js" integrity="sha256-lIS0dMoAFZciS54UrVzTS9jXeTg3oIX2V+azpRKr0Cg=" crossorigin="anonymous"></script> -->
+</head>
+
+<body>  
+  <div class="container" id="app">
+    <div id="modal-pyu0ribosn" class="bx--modal is-visible" role="dialog"
+    aria-modal="true" aria-labelledby="modal-pyu0ribosn-label" aria-describedby="modal-pyu0ribosn-heading" tabindex="-1"
+     >
+    <div class="bx--modal-container">
+      <div class="bx--modal-header">
+        <p class="bx--modal-header__heading bx--type-beta" id="modal-pyu0ribosn-heading">Enter Your Nick Name:</p>
+      </div>
+  
+      <!-- Note: Modals with content that scrolls, at any viewport, requires `tabindex="0"` on the `bx--modal-content` element -->
+  
+      <div class="bx--modal-content bx--modal-content--with-form" >
+        <div class="bx--form-item">
+          <input id="text-input-pyu0ribosn" type="text" class="bx--text-input" placeholder="Name"
+            v-model="nickName">
+        </div>
+      </div>
+      
+  
+      <div class="bx--modal-footer">
+        <button class="bx--btn bx--btn--primary" type="button" @click="submitNickName">Submit</button>
+      </div>
+    </div>
+    <!-- Note: focusable span allows for focus wrap feature within Modals -->
+    <span tabindex="0"></span>
+  </div>
+  <h3>version V4</h3>
+    <!-- <button @click="sendCall">Click me</button> -->
+   
+      <h1>Welcome {{ nickName}}</h1>
+  
+    
+    <div v-if="caller">
+      <h3>{{ caller }} calling</h3>
+      <button class="bx--btn bx--btn--primary" @click="receiveCall">Receive</button>
+    </div>
+    
+      <ul>
+        <li v-for="user in users"><button @click="sendCall(user.user)" class="bx--btn bx--btn--primary" >Call {{ user.nickName }}</button></li>
+      </ul>
+    
+    
+    <div class="flexChild" id="camera-container">
+      <div class="camera-box">
+        <video id="received_video" autoplay></video>
+        <video id="local_video" autoplay muted></video>
+        <button class="bx--btn bx--btn--danger" v-if="displayHangUp" id="hangup-button" @click="hangUpCall">
+          Hang Up
+        </button>
+      </div>
+    </div>
+    <button class="bx--btn bx--btn--danger" v-if="displayHangUp"  @click="removeVideo">
+      Remove Video
+    </button>
+
+  </div>
+  <script>
+    const socket = io();
+    
+  </script>
+  <script>
+    var mediaConstraints = {
+      audio: false, // We want an audio track
+      video: true // ...and we want a video track
+    }
+    var myPeerConnection;
+    var myStream;
+    
+  
+    var app = new Vue({
+    el: '#app',
+    // declare the data for the component (An array that houses the results and a query that holds the current search string)
+    data: {
+        caller: '',
+        videoOfferSdp: {},
+        videoReceiveSdp: {},
+        targetUserName: '',
+        users: [],
+        iceServers: {},
+        isVisible: true,
+        nickName: '',
+        displayHangUp: false
+    },
+    // declare methods in this Vue component. here only one method which performs the search is defined
+    methods: {
+        // make an axios request to the server with the current search query
+        async sendCall(user){
+          this.targetUserName = user;
+          this.displayHangUp = true
+          console.log('click')
+          if (myPeerConnection) {
+            alert("You can't start a call because you already have one open!");
+          } else {
+          socket.emit('callStart', {
+            name: socket.id,
+            target: this.targetUserName,
+            nickName: this.nickName
+          })
+          } 
+        },
+        async renderCall(s){
+          console.log(s);
+          this.displayHangUp = true
+          this.caller  = s.nickName;
+          await axios.get("/icecandidate")
+            .then(response => {
+               console.log(response.data.v);
+               ice = 
+                  []
+               
+               response.data.v.iceServers.urls.forEach( value => {
+                 ice.push({
+                  'url': value,
+                  'credential': response.data.v.iceServers.credential,
+                  'username': response.data.v.iceServers.username
+                 })
+               })
+               console.log(ice);
+
+               app.$data.iceServers = ice
+            })
+        },
+        receiveCall(){
+          console.log('rc');
+          socket.emit('StartNegotiation', {
+            name: socket.id,
+            target: this.targetUserName,
+            nickName: this.nickName
+          });
+        },
+        hangUpCall(){
+          closeVideoCall();
+          socket.emit('hangup',{
+            name: socket.id,
+            target: this.targetUserName,
+            nickName: this.nickName,
+            type: "hang-up"
+          });
+          this.displayHangUp = false;
+        },
+        getIceServer(){
+          axios.get("/icecandidate")
+            .then(response => {
+               console.log(response.data.v);
+               ice = 
+                  []
+               
+               response.data.v.iceServers.urls.forEach( value => {
+                 ice.push({
+                  'url': value,
+                  'credential': response.data.v.iceServers.credential,
+                  'username': response.data.v.iceServers.username
+                 })
+               })
+               console.log(ice);
+
+               this.iceServers = ice
+            })
+        },
+        submitNickName(){
+          socket.emit('nickName', {nickName : this.nickName})
+          document.getElementById('modal-pyu0ribosn').classList.remove('is-visible');
+        },
+        removeVideo() {
+          console.log(myStream)
+          var videoTrack = myStream.getVideoTracks();
+          const senders = myPeerConnection.getSenders()
+          // senders.forEach((sender) => {
+          //   if(sender.track.kind == 'video'){
+          //     myPeerConnection.removeTrack(sender);
+          // var localVideo = document.getElementById("local_video");
+          // var localTrack = localVideo.srcObject.getVideoTracks();
+          // localTrack.forEach(track => {
+          //   track.stop();
+          // });
+            //   }
+            // })
+          if (videoTrack.length === 0) {
+            alert("No local video available.");
+            return;
+          }
+          console.log("Toggling video mute state.");
+          for (var i = 0; i < videoTrack.length; ++i) {
+            console.log(i);
+            videoTrack[i].enabled = !videoTrack[i].enabled;
+          }
+          console.log("Video " + (videoTrack[0].enabled ? "unmuted." : "muted."));
+        } 
+      }    ,
+    mounted: function () {
+      // this.getIceServer();
+      
+      socket.on('callingStart', (s) => {
+        console.log(s);
+        this.targetUserName = s.name;
+        this.renderCall(s)
+      })
+
+      socket.on('startingNegotiation', async (s) => {
+        await axios.get("/icecandidate")
+            .then(response => {
+               console.log(response.data.v);
+               ice = 
+                  []
+               
+               response.data.v.iceServers.urls.forEach( value => {
+                 ice.push({
+                  'url': value,
+                  'credential': response.data.v.iceServers.credential,
+                  'username': response.data.v.iceServers.username
+                 })
+               })
+               console.log(ice);
+
+               this.iceServers = ice
+            })
+            createPeerConnection();
+
+            navigator.mediaDevices.getUserMedia(mediaConstraints)
+            .then(function(localStream) {
+              document.getElementById("local_video").srcObject = localStream;
+              myStream = localStream;
+              console.log(localStream);
+              localStream.getTracks().forEach(track => myPeerConnection.addTrack(track, localStream));
+            })
+            .catch(handleGetUserMediaError);
+      })
+      socket.on('calling', (s)=>{
+        console.log(s);
+        // this.targetUserName = s.name;
+        // this.videoOfferSdp = s;
+        handleVideoOfferMsg(s)
+      });
+      socket.on('ack', (s)=>{
+        console.log(s);
+        handleVideoAnswerMessage(s);
+        
+        this.videoReceiveSdp = s;
+      });
+      socket.on('icereceive', (s)=>{
+        console.log(s);
+        handleNewICECandidateMsg(s);
+      });
+      socket.on('joined', (s) => {
+        console.log(s);
+        this.users.push(s);
+      })
+      socket.on('hangupReceive', (s) => {
+        closeVideoCall();
+        this.displayHangUp = false;
+        this.caller = ''
+      })
+
+
+    },
+    // declare Vue watchers
+    watch: {
+        // watch for change in the query string and recall the search method
+        
+    }
+  })
+  </script>
+
+</body>
+
+</html>
